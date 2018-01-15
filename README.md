@@ -1,4 +1,4 @@
-*** dropwizard-worker ***
+# dropwizard-worker
 
 by Ian White, Stardog Ventures (@eonwhite)
 
