@@ -1,5 +1,6 @@
 package io.stardog.dropwizard.worker.workers;
 
+import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.GetQueueUrlResult;
 import com.amazonaws.services.sqs.model.Message;
@@ -23,7 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 public class SqsWorkerTest {
-    private AmazonSQSClient sqsClient;
+    private AmazonSQS sqsClient;
     private MetricRegistry metrics;
     private SqsWorker worker;
     private WorkerService service;
@@ -31,7 +32,7 @@ public class SqsWorkerTest {
 
     @Before
     public void setUp() throws Exception {
-        sqsClient = mock(AmazonSQSClient.class);
+        sqsClient = mock(AmazonSQS.class);
         metrics = new MetricRegistry();
         worker = new SqsWorker(sqsClient, "test-sqs", metrics);
 
