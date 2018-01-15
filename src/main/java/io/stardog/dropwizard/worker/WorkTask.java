@@ -26,7 +26,7 @@ import java.util.Map;
  *
  * Example:
  *
- *   curl -X POST "http://localhost:8081/tasks/work?method=myMethod&params=\{foo:'bar'\}"
+ *   curl -X POST "http://localhost:8081/tasks/work?method=myMethod";
  */
 @Singleton
 public class WorkTask extends Task {
