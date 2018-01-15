@@ -1,5 +1,6 @@
 package io.stardog.dropwizard.worker.workers;
 
+import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.Message;
@@ -46,7 +47,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Singleton
 public class SqsWorker implements Worker, Managed {
-    private final AmazonSQSClient sqsClient;
+    private final AmazonSQS sqs;
     private final String sqsName;
     private String sqsUrl;
     private final MetricRegistry metrics;
@@ -57,15 +58,15 @@ public class SqsWorker implements Worker, Managed {
     private final static Logger LOGGER = LoggerFactory.getLogger(SqsWorker.class);
 
     @Inject
-    public SqsWorker(AmazonSQSClient sqsClient, @Named("sqsName") String sqsName, MetricRegistry metrics) {
-        this.sqsClient = sqsClient;
+    public SqsWorker(AmazonSQS sqs, @Named("sqsName") String sqsName, MetricRegistry metrics) {
+        this.sqs = sqs;
         this.sqsName = sqsName;
         this.metrics = metrics;
     }
 
     @Override
     public void start() throws Exception {
-        this.sqsUrl = sqsClient.getQueueUrl(sqsName).getQueueUrl();
+        this.sqsUrl = sqs.getQueueUrl(sqsName).getQueueUrl();
     }
 
     @Override
@@ -79,7 +80,7 @@ public class SqsWorker implements Worker, Managed {
             throw new IllegalStateException("Called processMessages on SqsWorker without calling start() lifecycle method");
         }
         ReceiveMessageRequest request = new ReceiveMessageRequest(sqsUrl);
-        List<Message> messages = sqsClient.receiveMessage(request).getMessages();
+        List<Message> messages = sqs.receiveMessage(request).getMessages();
 
         if (messages.size() == 0) {
             return false;
@@ -100,7 +101,7 @@ public class SqsWorker implements Worker, Managed {
 
             try {
                 processMessage(service, workMessage);
-                sqsClient.deleteMessage(new DeleteMessageRequest(sqsUrl, message.getReceiptHandle()));
+                sqs.deleteMessage(new DeleteMessageRequest(sqsUrl, message.getReceiptHandle()));
                 metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "processed")).mark();
 
             } catch (Exception e) {
