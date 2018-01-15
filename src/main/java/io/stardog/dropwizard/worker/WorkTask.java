@@ -26,7 +26,7 @@ import java.util.Map;
  *
  * Example:
  *
- *   curl -X POST "http://localhost:8081/tasks/work?method=myMethod&params={'}
+ *   curl -X POST "http://localhost:8081/tasks/work?method=myMethod&params=\{foo:'bar'\}"
  */
 @Singleton
 public class WorkTask extends Task {
@@ -34,11 +34,16 @@ public class WorkTask extends Task {
     private final static ObjectMapper MAPPER = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module())
+                .configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
                 .configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
 
     @Inject
     public WorkTask(WorkerService service) {
-        super("work");
+        this("work", service);
+    }
+
+    public WorkTask(String name, WorkerService service) {
+        super(name);
         this.service = service;
     }
 
@@ -66,6 +71,6 @@ public class WorkTask extends Task {
         long startTime = System.currentTimeMillis();
         workMethod.getConsumer().accept(params);
         long elapsedTime = System.currentTimeMillis() - startTime;
-        writer.println("Complete, took " + elapsedTime + "ms");
+        writer.println("Completed in " + elapsedTime + "ms");
     }
 }
