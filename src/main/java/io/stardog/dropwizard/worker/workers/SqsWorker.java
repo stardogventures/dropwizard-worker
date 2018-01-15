@@ -87,13 +87,15 @@ public class SqsWorker implements Worker, Managed {
         }
 
         metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "received")).mark(messages.size());
+        LOGGER.debug("Received " + messages.size() + " messages");
 
         for (Message message : messages) {
+            LOGGER.debug("Processing message: " + message);
             WorkMessage workMessage;
             try {
                 workMessage = parseMessage(message);
             } catch (Exception e) {
-                LOGGER.warn("Exception parsing: " + message.getBody(), e);
+                LOGGER.warn("Exception parsing: " + message.getBody());
                 metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "error")).mark();
                 metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "error", "parse")).mark();
                 continue;
@@ -110,6 +112,8 @@ public class SqsWorker implements Worker, Managed {
                 metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "error", workMessage.getMethod())).mark();
             }
         }
+
+        LOGGER.debug("Completed processing " + messages.size() + " messages");
 
         return true;
     }

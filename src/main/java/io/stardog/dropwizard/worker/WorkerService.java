@@ -92,12 +92,16 @@ public class WorkerService implements Managed {
 
         isRunning = false;
         if (sleeper != null) {
+            LOGGER.debug("Cancelling sleeper thread");
             sleeper.cancel(false);
         }
 
+        LOGGER.debug("Shutting down worker");
         worker.stop();
 
+        LOGGER.debug("Shutting down scheduler");
         scheduler.shutdown();
+        LOGGER.debug("Awaiting termination for " + config.getMaxShutdownMillis() + "ms");
         scheduler.awaitTermination(config.getMaxShutdownMillis(), TimeUnit.MILLISECONDS);
         scheduler.shutdownNow();
 
@@ -118,7 +122,8 @@ public class WorkerService implements Managed {
 
     protected void scheduleProcessMessages(long millis) {
         try {
-            scheduler.schedule(() -> { this.processMessages(); }, millis, TimeUnit.MILLISECONDS);
+            LOGGER.debug("Scheduling next processMessages in " + millis + "ms");
+            sleeper = scheduler.schedule(() -> { this.processMessages(); }, millis, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             if (!isRunning) {
                 return;
@@ -154,6 +159,7 @@ public class WorkerService implements Managed {
         if (currentCount > config.getMaxThreads()) {
             workerCount.decrementAndGet();
         } else {
+            LOGGER.debug("Increasing workerCount to " + currentCount);
             submitProcessMessages();
         }
         currentIntervalMillis = config.getMinIntervalMillis();
@@ -161,6 +167,7 @@ public class WorkerService implements Managed {
 
     protected void decWorkers() {
         int currentCount = workerCount.decrementAndGet();
+        LOGGER.debug("Decreasing workerCount to " + currentCount);
 
         // if decrementing would reduce the number of workers to 0, then schedule a sleeper thread on an interval
         if (currentCount <= 0) {
