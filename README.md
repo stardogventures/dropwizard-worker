@@ -62,3 +62,29 @@ Features:
   to save money and resources.
   - Builtin metrics for monitoring the state of your queue.
   - Includes a Dropwizard Task to run methods manually.
+
+#### Timezone-aware crons
+
+While it's generally better to schedule crons in UTC time, there are situations
+where you want a cron to run at a time in a local timezone (e.g. "9 am Eastern time"),
+adjusting for Daylight Savings time.
+
+CloudWatch however does not support timezone-aware cron scheduling.
+
+So the solution is:
+
+  - Wrap your cron in a `TimeZoneCron` like so:
+```java
+     TimeZoneCron.of(new MyCron(), ZoneId.of("America/New_York"))
+```
+  - TimeZoneCron will check for a `dst` property in the params. If `dst`
+  is set to `true`, the cron will only run when in Daylight Savings Time,
+  and if `dst` is `false`, the cron will only run when not in Daylight
+  Savings Time.
+  - Schedule *two* otherwise identical CloudWatch SQS events at the two
+  potential times (e.g. 9am Eastern time could be either 13:00 UTC or
+  14:00 UTC), one with `"dst":true` and one with `"dst":false`
+  - TimeZoneCron will run your cron only once, depending on whether it
+  is currently DST or not.
+  - The above could get screwy if you schedule your cron in the wee hours
+  of the morning during the DST changeover period, so don't do that.
