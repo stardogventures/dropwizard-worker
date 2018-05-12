@@ -2,18 +2,17 @@ package io.stardog.dropwizard.worker;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
-import com.google.common.collect.ImmutableMap;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.dropwizard.lifecycle.Managed;
-import io.stardog.dropwizard.worker.data.WorkMethod;
 import io.stardog.dropwizard.worker.data.WorkerConfig;
-import io.stardog.dropwizard.worker.interfaces.Worker;
+import io.stardog.dropwizard.worker.interfaces.ManagedWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.Collection;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -21,10 +20,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Singleton
-public class WorkerService implements Managed {
+public class WorkerManager implements Managed {
     private final String name;
-    private final Map<String,WorkMethod> workMap;
-    private final Worker worker;
+    private final ManagedWorker worker;
     private final WorkerConfig config;
     private final MetricRegistry metrics;
 
@@ -35,20 +33,14 @@ public class WorkerService implements Managed {
     private volatile boolean isRunning = false;
     private long currentIntervalMillis;
 
-    private final static Logger LOGGER = LoggerFactory.getLogger(WorkerService.class);
+    private final static Logger LOGGER = LoggerFactory.getLogger(WorkerManager.class);
 
     @Inject
-    public WorkerService(String name, WorkerConfig config, Collection<WorkMethod> methods, Worker worker, MetricRegistry metrics) {
+    public WorkerManager(String name, WorkerConfig config, ManagedWorker worker, MetricRegistry metrics) {
         this.name = name;
         this.worker = worker;
         this.config = config;
         this.metrics = metrics;
-
-        ImmutableMap.Builder<String,WorkMethod> builder = ImmutableMap.builderWithExpectedSize(methods.size());
-        for (WorkMethod w : methods) {
-            builder.put(w.getMethod(), w);
-        }
-        this.workMap = builder.build();
 
         this.scheduler = Executors.newScheduledThreadPool(config.getMaxThreads());
         this.currentIntervalMillis = config.getMinIntervalMillis();
@@ -58,18 +50,6 @@ public class WorkerService implements Managed {
         return isRunning;
     }
 
-    public boolean isMethod(String methodName) {
-        return workMap.containsKey(methodName);
-    }
-
-    public WorkMethod getWorkMethod(String methodName) {
-        if (workMap.containsKey(methodName)) {
-            return workMap.get(methodName);
-        } else {
-            throw new IllegalArgumentException("Method not found: " + methodName);
-        }
-    }
-
     @Override
     public void start() throws Exception {
         LOGGER.info("Starting " + name + " with config: " + config);
@@ -77,9 +57,9 @@ public class WorkerService implements Managed {
         worker.start();
 
         workerCount.set(1);
-        metrics.register(MetricRegistry.name(WorkerService.class, name, "workers"),
+        metrics.register(MetricRegistry.name(WorkerManager.class, name, "workers"),
                 (Gauge<Integer>) ()-> workerCount.get());
-        metrics.register(MetricRegistry.name(WorkerService.class, name, "interval"),
+        metrics.register(MetricRegistry.name(WorkerManager.class, name, "interval"),
                 (Gauge<Long>) ()-> currentIntervalMillis);
 
         isRunning = true;
@@ -136,7 +116,7 @@ public class WorkerService implements Managed {
     protected void processMessages() {
         while (isRunning) {
             try {
-                boolean needsMoreWorkers = worker.processMessages(this);
+                boolean needsMoreWorkers = worker.processMessages();
                 if (needsMoreWorkers) {
                     incWorkers();
                 } else {

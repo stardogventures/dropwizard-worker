@@ -20,13 +20,12 @@ public class WorkerServiceTest {
         final AtomicBoolean didWork = new AtomicBoolean(false);
 
         WorkerConfig config = WorkerConfig.builder().incIntervalMillis(10).build();
-        LocalWorker testWorker = new LocalWorker();
-        List<WorkMethod> methods = ImmutableList.of(
+        WorkMethods methods = WorkMethods.of(ImmutableList.of(
                 WorkMethod.of("test-work", (params) -> { didWork.set(true); } )
-        );
-
-        WorkerService service = new WorkerService(
-                "worker-service", config, methods, testWorker, new MetricRegistry());
+        ));
+        LocalWorker testWorker = new LocalWorker(methods);
+        WorkerManager service = new WorkerManager(
+                "worker-service", config, testWorker, new MetricRegistry());
 
         assertFalse(service.isRunning());
         service.start();

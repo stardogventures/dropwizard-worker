@@ -1,22 +1,25 @@
 package io.stardog.dropwizard.worker.workers;
 
-import io.stardog.dropwizard.worker.WorkerService;
+import io.stardog.dropwizard.worker.WorkMethods;
+import io.stardog.dropwizard.worker.WorkerManager;
 import io.stardog.dropwizard.worker.data.WorkMessage;
-import io.stardog.dropwizard.worker.interfaces.Worker;
+import io.stardog.dropwizard.worker.interfaces.ManagedWorker;
 
 import javax.inject.Singleton;
 import java.util.LinkedList;
 import java.util.Queue;
 
 @Singleton
-public class LocalWorker implements Worker {
+public class LocalWorker implements ManagedWorker {
+    private final WorkMethods methods;
     private final Queue<WorkMessage> queue;
 
-    public LocalWorker() {
-        this(new LinkedList<>());
+    public LocalWorker(WorkMethods methods) {
+        this(methods, new LinkedList<>());
     }
 
-    public LocalWorker(Queue<WorkMessage> queue) {
+    public LocalWorker(WorkMethods methods, Queue<WorkMessage> queue) {
+        this.methods = methods;
         this.queue = queue;
     }
 
@@ -31,13 +34,13 @@ public class LocalWorker implements Worker {
     }
 
     @Override
-    public boolean processMessages(WorkerService service) {
+    public boolean processMessages() {
         WorkMessage message = queue.poll();
         if (message == null) {
             return false;
         }
 
-        service.getWorkMethod(message.getMethod()).getConsumer().accept(message.getParams());
+        methods.getMethod(message.getMethod()).getConsumer().accept(message.getParams());
 
         return true;
     }

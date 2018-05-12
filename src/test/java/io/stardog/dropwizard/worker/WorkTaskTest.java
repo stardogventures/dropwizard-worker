@@ -1,6 +1,7 @@
 package io.stardog.dropwizard.worker;
 
 import com.codahale.metrics.MetricRegistry;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import io.stardog.dropwizard.worker.data.WorkMethod;
@@ -10,7 +11,6 @@ import org.junit.Test;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
@@ -20,11 +20,10 @@ public class WorkTaskTest {
     public void execute() throws Exception {
         final AtomicInteger didWork = new AtomicInteger(0);
 
-        WorkerService service = new WorkerService("worker", WorkerConfig.builder().build(),
-                ImmutableSet.of(WorkMethod.of("testMethod", (params) -> { didWork.set(Integer.parseInt(params.get("val").toString())); })),
-                new LocalWorker(),
-                new MetricRegistry());
-        WorkTask task = new WorkTask(service);
+        WorkMethods methods = WorkMethods.of(ImmutableList.of(
+                WorkMethod.of("testMethod", (params) -> { didWork.set(Integer.parseInt(params.get("val").toString())); })
+        ));
+        WorkTask task = new WorkTask(methods);
         ImmutableMultimap<String,String> multimap = ImmutableMultimap.of(
                 "method", "testMethod",
                 "params", "{val:8}");

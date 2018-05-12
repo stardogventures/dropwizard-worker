@@ -25,24 +25,32 @@ class MyCron implements Consumer<<Map<String,Object>> {
     }
 }
 ```
+  - Build a `WorkerMethods` object that contains your list of `WorkMethods` available. Each
+WorkMethod gets a unique name for the method and a consumer. The names are important, since
+you'll use those names to call the method remotely.
+
+If you have some really simple methods, you may want to consider inlining them as lambdas.
   
-  - Configure a WorkerService with your configuration, list of methods,
-  and the specific worker you are intending to use for processing messages
+```java
+WorkerMethods methods = WorkerMethods.of(ImmutableList.of(
+        WorkMethod.of("cron", new MyCron()),
+        WorkMethod.of("ping", params -> System.out.println("pong"))
+));
+```  
+  - Configure a WorkerManager with your configuration,
+  and the worker you are using for processing messages
   (normally `SqsWorker`)
   
 ```java
-env.lifecycle().manage(new WorkerService(
+env.lifecycle().manage(new WorkerManager(
         "worker",
         WorkerConfig.builder().maxThreads(20).build(),
-        ImmutableList.of(
-                WorkMethod.of("MyCron", new MyCron())),
-                WorkMethod.of("AnotherCron", new AnotherCron()))
-        ),
         new SqsWorker(sqsClient, "queue-name", env.metrics()),
         env.metrics());
 ```  
   
-  - Send to the queue (from anywhere in your distributed system) messages in the format:
+  - Send to the queue (from anywhere in your distributed system, such as for example CloudWatch)
+  messages in the format:
   
 ```
   {"method":<method>}
@@ -56,13 +64,19 @@ Where `method` is the name of the method, `params` is an object containing
 your parameters, and `at` is a millisecond timestamp of the time the message was
 queued.
 
+  - You can also send messages with a `SqsSender` like so:
+  
+```java
+SqsSender sender = new SqsSender(sqsClient, "queue-name")
+```  
+
 Features:
   - Scales up for busy queues, launching threads and polling as quickly
   as possible, but automatically scaling down for infrequently used queues
   to save money and resources.
   - Builtin metrics for monitoring the state of your queue.
   - Includes a Dropwizard Task to run methods manually.
-
+  
 #### Timezone-aware crons
 
 While it's generally better to schedule crons in UTC time, there are situations
@@ -88,3 +102,18 @@ So the solution is:
   is currently DST or not.
   - The above could get screwy if you schedule your cron in the wee hours
   of the morning during the DST changeover period, so don't do that.
+  
+#### Redis PubSub
+  
+dropwizard-worker can send and receive messages in the same format using Redis PubSub
+via Jedis.
+
+This can be useful instead of SQS in situations where you require
+multiple-subscriber behavior -- for example to have your appservers subscribe
+to a cache invalidation mechanism.
+
+Because the Jedis client handles its own polling, there is no need to use the `WorkerManager`
+with Redis. You can instantiate `RedisWorker` to consume pubsub, and `RedisSender` to send
+messages.
+
+See the `RedisExample` example for how this works.

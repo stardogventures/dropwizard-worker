@@ -1,7 +1,6 @@
 package io.stardog.dropwizard.worker.workers;
 
 import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
@@ -10,10 +9,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.dropwizard.lifecycle.Managed;
-import io.stardog.dropwizard.worker.WorkerService;
+import io.stardog.dropwizard.worker.WorkMethods;
 import io.stardog.dropwizard.worker.data.WorkMessage;
-import io.stardog.dropwizard.worker.interfaces.Worker;
+import io.stardog.dropwizard.worker.interfaces.ManagedWorker;
 import io.stardog.dropwizard.worker.data.WorkMethod;
+import io.stardog.dropwizard.worker.util.WorkerDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,22 +46,30 @@ import java.util.concurrent.TimeUnit;
  *      amount of time messages of each type are taking to process
  */
 @Singleton
-public class SqsWorker implements Worker, Managed {
+public class SqsWorker implements ManagedWorker, Managed {
     private final AmazonSQS sqs;
     private final String sqsName;
     private String sqsUrl;
+    private final WorkMethods methods;
     private final MetricRegistry metrics;
-
-    private final static ObjectMapper MAPPER = new ObjectMapper()
-            .registerModule(new JavaTimeModule())
-            .registerModule(new Jdk8Module());
+    private final ObjectMapper mapper;
     private final static Logger LOGGER = LoggerFactory.getLogger(SqsWorker.class);
 
     @Inject
-    public SqsWorker(AmazonSQS sqs, @Named("sqsName") String sqsName, MetricRegistry metrics) {
+    public SqsWorker(WorkMethods methods, AmazonSQS sqs, @Named("sqsName") String sqsName, MetricRegistry metrics, ObjectMapper mapper) {
+        this.methods = methods;
         this.sqs = sqs;
         this.sqsName = sqsName;
         this.metrics = metrics;
+        this.mapper = mapper;
+    }
+
+    public SqsWorker(WorkMethods methods, AmazonSQS sqs, String sqsName, MetricRegistry metrics) {
+        this(methods, sqs, sqsName, metrics, WorkerDefaults.MAPPER);
+    }
+
+    public SqsWorker(WorkMethods methods, AmazonSQS sqs, String sqsName) {
+        this(methods, sqs, sqsName, new MetricRegistry(), WorkerDefaults.MAPPER);
     }
 
     @Override
@@ -75,7 +83,7 @@ public class SqsWorker implements Worker, Managed {
     }
 
     @Override
-    public boolean processMessages(WorkerService service) {
+    public boolean processMessages() {
         if (sqsUrl == null) {
             throw new IllegalStateException("Called processMessages on SqsWorker without calling start() lifecycle method");
         }
@@ -102,7 +110,7 @@ public class SqsWorker implements Worker, Managed {
             }
 
             try {
-                processMessage(service, workMessage);
+                processMessage(workMessage);
                 sqs.deleteMessage(new DeleteMessageRequest(sqsUrl, message.getReceiptHandle()));
                 metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "processed")).mark();
 
@@ -119,10 +127,10 @@ public class SqsWorker implements Worker, Managed {
     }
 
     protected WorkMessage parseMessage(Message message) throws IOException {
-        return MAPPER.readValue(message.getBody(), WorkMessage.class);
+        return mapper.readValue(message.getBody(), WorkMessage.class);
     }
 
-    protected void processMessage(WorkerService service, WorkMessage message) {
+    protected void processMessage(WorkMessage message) {
         long startTime = System.currentTimeMillis();
 
         if (message.getQueueAt().isPresent()) {
@@ -132,7 +140,7 @@ public class SqsWorker implements Worker, Managed {
                     .update(delayTime, TimeUnit.MILLISECONDS);
         }
 
-        WorkMethod workMethod = service.getWorkMethod(message.getMethod());
+        WorkMethod workMethod = methods.getMethod(message.getMethod());
         workMethod.getConsumer().accept(message.getParams());
         long endTime = System.currentTimeMillis();
 

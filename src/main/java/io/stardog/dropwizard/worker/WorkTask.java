@@ -2,9 +2,7 @@ package io.stardog.dropwizard.worker;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.collect.ImmutableMap;
@@ -30,7 +28,7 @@ import java.util.Map;
  */
 @Singleton
 public class WorkTask extends Task {
-    private final WorkerService service;
+    private final WorkMethods methods;
     private final static ObjectMapper MAPPER = new ObjectMapper()
                 .registerModule(new JavaTimeModule())
                 .registerModule(new Jdk8Module())
@@ -38,13 +36,13 @@ public class WorkTask extends Task {
                 .configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true);
 
     @Inject
-    public WorkTask(WorkerService service) {
-        this("work", service);
+    public WorkTask(WorkMethods methods) {
+        this("work", methods);
     }
 
-    public WorkTask(String name, WorkerService service) {
+    public WorkTask(String name, WorkMethods methods) {
         super(name);
-        this.service = service;
+        this.methods = methods;
     }
 
     @Override
@@ -55,12 +53,12 @@ public class WorkTask extends Task {
         }
 
         String methodName = (String)((List)taskParams.get("method")).get(0);
-        if (!service.isMethod(methodName)) {
+        if (!methods.isMethod(methodName)) {
             writer.println("Invalid method: " + methodName);
             return;
         }
 
-        WorkMethod workMethod = service.getWorkMethod(methodName);
+        WorkMethod workMethod = methods.getMethod(methodName);
         Map<String,Object> params = ImmutableMap.of();
         if (taskParams.containsKey("params")) {
             String paramsJson = (String)((List)taskParams.get("params")).get(0);

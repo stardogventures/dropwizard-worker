@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @AutoValue
-@JsonInclude(JsonInclude.Include.NON_EMPTY)
+@JsonInclude(JsonInclude.Include.NON_ABSENT)
 public abstract class WorkMessage {
     @JsonProperty("method")
     public abstract String getMethod();
