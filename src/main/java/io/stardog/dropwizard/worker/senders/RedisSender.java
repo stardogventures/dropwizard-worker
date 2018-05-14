@@ -8,25 +8,26 @@ import io.stardog.dropwizard.worker.util.WorkerDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 
 import javax.inject.Inject;
 import java.io.UncheckedIOException;
 
 public class RedisSender implements Sender {
-    private final Jedis jedis;
+    private final JedisPool jedisPool;
     private final String defaultChannel;
     private final ObjectMapper mapper;
     private final Logger LOGGER = LoggerFactory.getLogger(RedisSender.class);
 
     @Inject
-    public RedisSender(Jedis jedis, String defaultChannel, ObjectMapper mapper) {
-        this.jedis = jedis;
+    public RedisSender(JedisPool jedisPool, String defaultChannel, ObjectMapper mapper) {
+        this.jedisPool = jedisPool;
         this.defaultChannel = defaultChannel;
         this.mapper = mapper;
     }
 
-    public RedisSender(Jedis jedis, String defaultChannel) {
-        this(jedis, defaultChannel, WorkerDefaults.MAPPER);
+    public RedisSender(JedisPool jedisPool, String defaultChannel) {
+        this(jedisPool, defaultChannel, WorkerDefaults.MAPPER);
     }
 
     @Override
@@ -37,7 +38,9 @@ public class RedisSender implements Sender {
     public void send(WorkMessage message, String channel) {
         try {
             String payload = mapper.writeValueAsString(message);
+            Jedis jedis = jedisPool.getResource();
             jedis.publish(channel, payload);
+            jedis.close();
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
         }

@@ -2,7 +2,6 @@ package io.stardog.dropwizard.worker.workers;
 
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.ImmutableSet;
 import io.dropwizard.lifecycle.Managed;
 import io.stardog.dropwizard.worker.WorkMethods;
 import io.stardog.dropwizard.worker.data.WorkMessage;
@@ -11,12 +10,12 @@ import io.stardog.dropwizard.worker.util.WorkerDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPubSub;
 
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -24,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 public class RedisWorker implements Managed {
     private final WorkMethods workMethods;
-    private final Jedis jedis;
+    private final JedisPool jedisPool;
     private final String channel;
     private final ObjectMapper mapper;
     private final MetricRegistry metrics;
@@ -33,21 +32,21 @@ public class RedisWorker implements Managed {
     private JedisPubSub subscriber;
 
     @Inject
-    public RedisWorker(WorkMethods workMethods, Jedis jedis, @Named("redisWorkerChannel") String channel, MetricRegistry metrics, ObjectMapper mapper) {
+    public RedisWorker(WorkMethods workMethods, JedisPool jedisPool, @Named("redisWorkerChannel") String channel, MetricRegistry metrics, ObjectMapper mapper) {
         this.workMethods = workMethods;
-        this.jedis = jedis;
+        this.jedisPool = jedisPool;
         this.channel = channel;
         this.mapper = mapper;
         this.metrics = metrics;
         executorService = Executors.newFixedThreadPool(1);
     }
 
-    public RedisWorker(WorkMethods workMethods, Jedis jedis, String channel) {
-        this(workMethods, jedis, channel, new MetricRegistry(), WorkerDefaults.MAPPER);
+    public RedisWorker(WorkMethods workMethods, JedisPool jedisPool, String channel) {
+        this(workMethods, jedisPool, channel, new MetricRegistry(), WorkerDefaults.MAPPER);
     }
 
-    public RedisWorker(WorkMethods workMethods, Jedis jedis, String channel, MetricRegistry metrics) {
-        this(workMethods, jedis, channel, metrics, WorkerDefaults.MAPPER);
+    public RedisWorker(WorkMethods workMethods, JedisPool jedisPool, String channel, MetricRegistry metrics) {
+        this(workMethods, jedisPool, channel, metrics, WorkerDefaults.MAPPER);
     }
 
     @Override
@@ -79,7 +78,7 @@ public class RedisWorker implements Managed {
                         }
                     }
                 };
-                jedis.subscribe(subscriber, channel);
+                jedisPool.getResource().subscribe(subscriber, channel);
             });
         } catch (Exception e) {
             LOGGER.warn("Unable to subscribe to redis", e);

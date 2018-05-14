@@ -6,6 +6,7 @@ import io.stardog.dropwizard.worker.data.WorkMessage;
 import io.stardog.dropwizard.worker.data.WorkMethod;
 import org.junit.Test;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -20,7 +21,7 @@ public class RedisWorkerTest {
         WorkMethods workMethods = WorkMethods.of(ImmutableList.of(
                 WorkMethod.of("test", (params) -> didWork.set(true))
         ));
-        RedisWorker worker = new RedisWorker(workMethods, mock(Jedis.class), "channel");
+        RedisWorker worker = new RedisWorker(workMethods, mock(JedisPool.class), "channel");
         worker.processMessage(WorkMessage.of("test"));
 
         assertTrue(didWork.get());

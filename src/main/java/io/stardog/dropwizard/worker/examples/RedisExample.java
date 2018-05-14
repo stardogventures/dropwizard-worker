@@ -13,6 +13,7 @@ import io.stardog.dropwizard.worker.workers.RedisWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisPool;
 
 public class RedisExample {
     private final static Logger LOGGER = LoggerFactory.getLogger(RedisExample.class);
@@ -22,12 +23,14 @@ public class RedisExample {
                 WorkMethod.of("ping", params -> LOGGER.info("Received pong"))
         ));
 
-        RedisWorker worker = new RedisWorker(workMethods, new Jedis("localhost", 6379), "example");
+        JedisPool jedisPool = new JedisPool("localhost", 6379);
+
+        RedisWorker worker = new RedisWorker(workMethods, jedisPool, "example");
         worker.start();
 
         LOGGER.info("Sending ping");
 
-        RedisSender sender = new RedisSender(new Jedis("localhost", 6379), "example");
+        RedisSender sender = new RedisSender(jedisPool, "example");
         sender.send(WorkMessage.of("ping"));
 
         LOGGER.info("Sending another ping");
