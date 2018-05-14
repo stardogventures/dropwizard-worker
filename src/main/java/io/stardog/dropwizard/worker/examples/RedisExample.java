@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableList;
 import io.stardog.dropwizard.worker.WorkMethods;
 import io.stardog.dropwizard.worker.data.WorkMessage;
 import io.stardog.dropwizard.worker.data.WorkMethod;
+import io.stardog.dropwizard.worker.health.RedisHealthCheck;
 import io.stardog.dropwizard.worker.senders.RedisSender;
 import io.stardog.dropwizard.worker.workers.RedisWorker;
 import org.slf4j.Logger;
