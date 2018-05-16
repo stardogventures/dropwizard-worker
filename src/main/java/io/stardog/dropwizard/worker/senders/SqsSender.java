@@ -8,6 +8,7 @@ import io.stardog.dropwizard.worker.data.WorkMessage;
 import io.stardog.dropwizard.worker.interfaces.Sender;
 import io.stardog.dropwizard.worker.util.WorkerDefaults;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import java.io.UncheckedIOException;
@@ -26,7 +27,7 @@ public class SqsSender implements Sender {
         this.mapper = mapper;
     }
 
-    public SqsSender(AmazonSQS sqs, String defaultQueueName, String defaultMessageGroupId) {
+    public SqsSender(AmazonSQS sqs, String defaultQueueName, @Nullable String defaultMessageGroupId) {
         this(sqs, defaultQueueName, defaultMessageGroupId, WorkerDefaults.MAPPER);
     }
 
@@ -35,13 +36,15 @@ public class SqsSender implements Sender {
         send(message, defaultQueueName, defaultMessageGroupId);
     }
 
-    public void send(WorkMessage message, String queueName, String messageGroupId) {
+    public void send(WorkMessage message, String queueName, @Nullable String messageGroupId) {
         try {
             String body = mapper.writeValueAsString(message);
             SendMessageRequest request = new SendMessageRequest()
                     .withQueueUrl(sqs.getQueueUrl(queueName).getQueueUrl())
-                    .withMessageGroupId(messageGroupId)
                     .withMessageBody(body);
+            if (messageGroupId != null) {
+                    request.withMessageGroupId(messageGroupId);
+            }
             sqs.sendMessage(request);
         } catch (JsonProcessingException e) {
             throw new UncheckedIOException(e);
