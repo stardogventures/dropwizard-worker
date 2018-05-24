@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class WorkerManager implements Managed {
     private final String name;
     private final ManagedWorker worker;
-    private final WorkerConfig config;
+    private final Provider<WorkerConfig> configProvider;
     private final MetricRegistry metrics;
 
     private final AtomicInteger workerCount = new AtomicInteger(0);
@@ -37,10 +38,16 @@ public class WorkerManager implements Managed {
 
     @Inject
     public WorkerManager(String name, WorkerConfig config, ManagedWorker worker, MetricRegistry metrics) {
+        this(name, () -> config, worker, metrics);
+    }
+
+    public WorkerManager(String name, Provider<WorkerConfig> configProvider, ManagedWorker worker, MetricRegistry metrics) {
         this.name = name;
         this.worker = worker;
-        this.config = config;
+        this.configProvider = configProvider;
         this.metrics = metrics;
+
+        WorkerConfig config = configProvider.get();
 
         this.scheduler = Executors.newScheduledThreadPool(config.getMaxThreads());
         this.currentIntervalMillis = config.getMinIntervalMillis();
@@ -52,7 +59,7 @@ public class WorkerManager implements Managed {
 
     @Override
     public void start() throws Exception {
-        LOGGER.info("Starting " + name + " with config: " + config);
+        LOGGER.info("Starting " + name + " with initial config: " + configProvider.get());
 
         worker.start();
 
@@ -81,8 +88,9 @@ public class WorkerManager implements Managed {
 
         LOGGER.debug("Shutting down scheduler");
         scheduler.shutdown();
-        LOGGER.debug("Awaiting termination for " + config.getMaxShutdownMillis() + "ms");
-        scheduler.awaitTermination(config.getMaxShutdownMillis(), TimeUnit.MILLISECONDS);
+        long maxShutdownMillis = configProvider.get().getMaxShutdownMillis();
+        LOGGER.debug("Awaiting termination for " + maxShutdownMillis + "ms");
+        scheduler.awaitTermination(maxShutdownMillis, TimeUnit.MILLISECONDS);
         scheduler.shutdownNow();
 
         LOGGER.info("Finished shutdown");
@@ -132,6 +140,7 @@ public class WorkerManager implements Managed {
     }
 
     protected void incWorkers() {
+        WorkerConfig config = configProvider.get();
         if (workerCount.get() >= config.getMaxThreads()) {
             return;
         }
@@ -146,6 +155,7 @@ public class WorkerManager implements Managed {
     }
 
     protected void decWorkers() {
+        WorkerConfig config = configProvider.get();
         int currentCount = workerCount.decrementAndGet();
         LOGGER.debug("Decreasing workerCount to " + currentCount);
 
