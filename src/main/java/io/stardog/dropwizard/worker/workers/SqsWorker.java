@@ -110,9 +110,13 @@ public class SqsWorker implements ManagedWorker, Managed {
             }
 
             try {
-                processMessage(workMessage);
-                sqs.deleteMessage(new DeleteMessageRequest(sqsUrl, message.getReceiptHandle()));
-                metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "processed")).mark();
+                boolean processed = processMessage(workMessage);
+                if (processed) {
+                    sqs.deleteMessage(new DeleteMessageRequest(sqsUrl, message.getReceiptHandle()));
+                    metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "processed")).mark();
+                } else {
+                    metrics.meter(MetricRegistry.name(SqsWorker.class, sqsName, "skipped")).mark();
+                }
 
             } catch (Exception e) {
                 LOGGER.warn("Exception processing: " + message.getBody(), e);
@@ -130,7 +134,7 @@ public class SqsWorker implements ManagedWorker, Managed {
         return mapper.readValue(message.getBody(), WorkMessage.class);
     }
 
-    protected void processMessage(WorkMessage message) {
+    protected boolean processMessage(WorkMessage message) {
         long startTime = System.currentTimeMillis();
 
         if (message.getQueueAt().isPresent()) {
@@ -141,10 +145,12 @@ public class SqsWorker implements ManagedWorker, Managed {
         }
 
         WorkMethod workMethod = methods.getMethod(message.getMethod());
-        workMethod.getConsumer().accept(message.getParams());
+        boolean result = workMethod.getFunction().apply(message.getParams());
         long endTime = System.currentTimeMillis();
 
         metrics.timer(MetricRegistry.name(SqsWorker.class, sqsName, "timer", message.getMethod()))
                 .update(endTime - startTime, TimeUnit.MILLISECONDS);
+
+        return result;
     }
 }

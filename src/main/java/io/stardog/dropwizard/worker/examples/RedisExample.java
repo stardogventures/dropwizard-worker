@@ -20,7 +20,7 @@ public class RedisExample {
 
     public static void main(String[] arg) throws Exception {
         WorkMethods workMethods = WorkMethods.of(ImmutableList.of(
-                WorkMethod.of("ping", params -> LOGGER.info("Received pong"))
+                WorkMethod.of("ping", params -> { LOGGER.info("Received pong"); })
         ));
 
         JedisPool jedisPool = new JedisPool("localhost", 6379);

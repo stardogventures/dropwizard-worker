@@ -106,7 +106,7 @@ public class RedisWorker implements Managed {
         }
 
         WorkMethod workMethod = workMethods.getMethod(message.getMethod());
-        workMethod.getConsumer().accept(message.getParams());
+        workMethod.getFunction().apply(message.getParams());
         long endTime = System.currentTimeMillis();
 
         metrics.timer(MetricRegistry.name(RedisWorker.class, channel, "timer", message.getMethod()))

@@ -67,8 +67,12 @@ public class WorkTask extends Task {
 
         writer.println("Running " + methodName + "(" + MAPPER.writeValueAsString(params) + ")");
         long startTime = System.currentTimeMillis();
-        workMethod.getConsumer().accept(params);
+        boolean result = workMethod.getFunction().apply(params);
         long elapsedTime = System.currentTimeMillis() - startTime;
-        writer.println("Completed in " + elapsedTime + "ms");
+        if (result) {
+            writer.println("Completed in " + elapsedTime + "ms");
+        } else {
+            writer.println("Skipped in " + elapsedTime + "ms");
+        }
     }
 }

@@ -40,7 +40,7 @@ public class LocalWorker implements ManagedWorker {
             return false;
         }
 
-        methods.getMethod(message.getMethod()).getConsumer().accept(message.getParams());
+        methods.getMethod(message.getMethod()).getFunction().apply(message.getParams());
 
         return true;
     }
